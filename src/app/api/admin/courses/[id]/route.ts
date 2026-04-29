@@ -95,3 +95,28 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ ok: true });
 }
 
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireTenantId();
+  if ("error" in auth) return auth.error;
+
+  const tenantId = auth.tenantId;
+
+  const course = await prisma.course.findFirst({
+    where: { id: params.id, tenantId },
+    select: { id: true },
+  });
+  if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const actionsCount = await prisma.trainingAction.count({ where: { courseId: course.id, tenantId } });
+  if (actionsCount > 0) {
+    return NextResponse.json(
+      { error: "Não é possível apagar um curso com ações associadas." },
+      { status: 409 },
+    );
+  }
+
+  await prisma.courseModule.deleteMany({ where: { courseId: course.id } });
+  await prisma.course.delete({ where: { id: course.id } });
+
+  return NextResponse.json({ ok: true });
+}

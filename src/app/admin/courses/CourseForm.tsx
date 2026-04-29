@@ -39,6 +39,7 @@ type CourseFormProps = {
 export function CourseForm({ mode, courseId, tenantSlug, areas, initialValues }: CourseFormProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const defaults: CourseFormValues = useMemo(
     () => ({
@@ -114,6 +115,28 @@ export function CourseForm({ mode, courseId, tenantSlug, areas, initialValues }:
       router.refresh();
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function onDelete() {
+    if (mode !== "edit" || !courseId) return;
+    const ok = window.confirm("Apagar este curso? Esta ação não pode ser desfeita.");
+    if (!ok) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(courseId)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.error ?? "Falha ao apagar.");
+        return;
+      }
+
+      toast.success("Curso apagado.");
+      router.push("/admin/courses");
+      router.refresh();
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -223,14 +246,21 @@ export function CourseForm({ mode, courseId, tenantSlug, areas, initialValues }:
       </Card>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-        <Button asChild variant="outline" disabled={isSaving}>
-          <a href="/admin/courses">Voltar</a>
-        </Button>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button asChild variant="secondary" disabled={isSaving}>
+          <Button asChild variant="outline" disabled={isSaving || isDeleting}>
+          <a href="/admin/courses">Voltar</a>
+          </Button>
+          {mode === "edit" ? (
+            <Button type="button" variant="destructive" onClick={onDelete} disabled={isSaving || isDeleting}>
+              {isDeleting ? "A apagar..." : "Apagar"}
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button asChild variant="secondary" disabled={isSaving || isDeleting}>
             <a href={`/${tenantSlug}/catalog`}>Ver catálogo</a>
           </Button>
-          <Button type="submit" disabled={isSaving}>
+          <Button type="submit" disabled={isSaving || isDeleting}>
             {isSaving ? "A guardar..." : "Guardar"}
           </Button>
         </div>
@@ -238,4 +268,3 @@ export function CourseForm({ mode, courseId, tenantSlug, areas, initialValues }:
     </form>
   );
 }
-
